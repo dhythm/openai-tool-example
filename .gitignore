@@ -1,0 +1,7 @@
+# パッケージ
+node_modules
+dist
+
+# 環境変数
+.env
+!.env.example
