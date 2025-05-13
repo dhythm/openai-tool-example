@@ -59,13 +59,13 @@ async function run() {
     throw new Error("toolCalls is undefined");
   }
 
-  const args = JSON.parse(toolCalls[0].function.arguments);
+  // アシスタントのメッセージを追加
+  messages.push(chatCompletion.choices[0].message);
 
   for (const toolCall of toolCalls) {
     const args = JSON.parse(toolCall.function.arguments);
 
     // ツールの応答をメッセージ履歴に追加
-
     messages.push({
       role: "tool",
       content: await fetchWeather("tokyo", args["format"]),
@@ -97,8 +97,6 @@ async function fetchWeather(location: string, format: string) {
   const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`;
   const weatherResponse = await fetch(weatherUrl);
   const weatherData = await weatherResponse.json();
-
-  console.log(weatherData);
 
   const weather = {
     temperature: weatherData.current_weather.temperature,
