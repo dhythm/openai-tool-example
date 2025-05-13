@@ -7,24 +7,26 @@ const client = new OpenAI({
 });
 
 async function run() {
-  const response = await client.responses.create({
-    model: "gpt-4o-mini",
-    tools: [{ type: "web_search_preview" }],
-    input: "What was a positive news story from today?",
-    // instructions: "You are a helpful assistant.",
-  });
+  //   const response = await client.responses.create({
+  //     model: "gpt-4o-mini",
+  //     tools: [{ type: "web_search_preview" }],
+  //     input: "What was a positive news story from today?",
+  //     // instructions: "You are a helpful assistant.",
+  //   });
 
-  console.log(
-    "------------------------------\n",
-    response,
-    "\n------------------------------"
-  );
+  //   console.log(
+  //     "------------------------------\n",
+  //     response,
+  //     "\n------------------------------"
+  //   );
+
+  const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+    { role: "user", content: "東京の現在の天気を摂氏で教えて下さい。" },
+  ];
 
   const chatCompletion = await client.chat.completions.create({
     model: "gpt-4o-mini",
-    messages: [
-      { role: "user", content: "東京の現在の天気を摂氏で教えて下さい。" },
-    ],
+    messages,
     tools: [
       {
         type: "function",
@@ -57,18 +59,16 @@ async function run() {
     throw new Error("toolCalls is undefined");
   }
 
-  const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
+  const args = JSON.parse(toolCalls[0].function.arguments);
+
   for (const toolCall of toolCalls) {
-    const functionName = toolCall.function.name;
     const args = JSON.parse(toolCall.function.arguments);
 
-    if (functionName === "getCurrentWeather") {
-      console.log(args);
-    }
+    // ツールの応答をメッセージ履歴に追加
 
     messages.push({
       role: "tool",
-      content: `${args["location"]}の現在の天気は晴れ、25${args["format"]}です。`,
+      content: await fetchWeather("tokyo", args["format"]),
       tool_call_id: toolCall.id,
     });
   }
@@ -84,5 +84,95 @@ async function run() {
     "\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
   );
 }
+
+async function fetchWeather(location: string, format: string) {
+  const geocodingUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
+    location
+  )}&count=1`;
+  const geocodingResponse = await fetch(geocodingUrl);
+  const geocodingData = await geocodingResponse.json();
+
+  const { latitude, longitude, name } = geocodingData.results[0];
+
+  const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`;
+  const weatherResponse = await fetch(weatherUrl);
+  const weatherData = await weatherResponse.json();
+
+  console.log(weatherData);
+
+  const weather = {
+    temperature: weatherData.current_weather.temperature,
+    windSpeed: weatherData.current_weather.wind_speed,
+    weatherCondition:
+      WEATHER_CONDITIONS[
+        weatherData.current_weather
+          .weathercode as keyof typeof WEATHER_CONDITIONS
+      ],
+    location: name,
+  };
+
+  return `${weather.location}の現在の天気は${weather.weatherCondition}で、${weather.temperature}${format}です。`;
+}
+
+/**
+  "0": "Clear sky",
+  "1": "Mainly clear",
+  "2": "Partly cloudy",
+  "3": "Overcast",
+  "45": "Fog and depositing rime fog",
+  "48": "Fog and depositing rime fog",
+  "51": "Drizzle: Light intensity",
+  "53": "Drizzle: Moderate intensity",
+  "55": "Drizzle: Dense intensity",
+  "56": "Freezing Drizzle: Light intensity",
+  "57": "Freezing Drizzle: Dense intensity",
+  "61": "Rain: Slight intensity",
+  "63": "Rain: Moderate intensity",
+  "65": "Rain: Heavy intensity",
+  "66": "Freezing Rain: Light intensity",
+  "67": "Freezing Rain: Heavy intensity",
+  "71": "Snow fall: Slight intensity",
+  "73": "Snow fall: Moderate intensity",
+  "75": "Snow fall: Heavy intensity",
+  "77": "Snow grains",
+  "80": "Rain showers: Slight intensity",
+  "81": "Rain showers: Moderate intensity",
+  "82": "Rain showers: Violent intensity",
+  "85": "Snow showers: Slight intensity",
+  "86": "Snow showers: Heavy intensity",
+  "95": "Thunderstorm: Slight or moderate",
+  "96": "Thunderstorm with slight hail",
+  "99": "Thunderstorm with heavy hail"
+ */
+const WEATHER_CONDITIONS = {
+  "0": "快晴",
+  "1": "おおむね晴れ",
+  "2": "晴れ時々曇り",
+  "3": "くもり",
+  "45": "霧",
+  "48": "着氷性の霧",
+  "51": "霧雨",
+  "53": "霧雨",
+  "55": "強い霧雨",
+  "56": "弱い着氷性の霧雨",
+  "57": "着氷性の霧雨",
+  "61": "弱い雨",
+  "63": "雨",
+  "65": "強い雨",
+  "66": "弱い凍雨",
+  "67": "凍雨",
+  "71": "弱い雪",
+  "73": "雪",
+  "75": "強い雪",
+  "77": "雪粒",
+  "80": "弱いにわか雨",
+  "81": "にわか雨",
+  "82": "強いにわか雨",
+  "85": "弱いにわか雪",
+  "86": "にわか雪",
+  "95": "雷雨",
+  "96": "雷雨（ひょうを伴う）",
+  "99": "激しい雷雨（ひょうを伴う）",
+};
 
 run();
