@@ -42,7 +42,7 @@ async function run() {
               },
               format: {
                 type: "string",
-                description: "音頭の単位",
+                description: "温度の単位",
                 enum: ["celsius", "fahrenheit"],
               },
             },
